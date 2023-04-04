@@ -1,0 +1,152 @@
+from pyspark.sql.types import StructType, StringType, IntegerType, DoubleType, LongType
+
+schema10 = StructType().add("txn_id",StringType(),True).add("cust_id",StringType(),True).add("age",StringType(),True).add("zipcode",StringType(),True).add("category",StringType(),True).add("product",StringType(),True).add("qty",IntegerType(),True).add("cost",IntegerType(),True).add("sale",IntegerType(),True)
+
+retail = spark.read.format("csv").option("header","False").schema(schema10).load("hdfs://nameservice1/user/bigcdac43211/retail")
+
+But pura data ek hi column mai aajayga cause ye file ka , tha hi nahi and pura line will go to first column
+so we have to specify the separator
+
+retail = spark.read.format("csv").option("sep",";").option("header","False").schema(schema10).load("hdfs://nameservice1/user/bigcdac43211/retail")
+
+retail.registerTempTable("retail")
+
+1)	Count of unique customers and total sales for each age group and for a given month = Jan
+
+Hint : where month(txn_dt) = 1
+
+A	5000		600000
+B	4500		540000
+
+txn_id|   cust_id|age|zipcode|category|      product|qty|cost|sale|
+
+select age ,count(distinct cust_id) as unique_customer_count, sum(sale) as total_sales
+from retail
+where month(txn_id) = 1 
+group by age
+order by age
+
+
++---+---------------------+-----------+
+|age|unique_customer_count|total_sales|                                                                                                       
++---+---------------------+-----------+                                                                                                       
+| A |                  686|     908494|                                                                                                       
+| B |                 1489|    2565452|                                                                                                       
+| C |                 2922|    5358113|                                                                                                       
+| D |                 3346|    6694313|                                                                                                       
+| E |                 2691|    5521770|                                                                                                       
+| F |                 2031|    3797484|                                                                                                       
+| G |                 1229|    2135538|                                                                                                       
+| H |                  594|    1040837|                                                                                                       
+| I |                  506|     938571|                                                                                                       
+| J |                  769|     955095|                                                                                                       
+| K |                  315|     772812|                                                                                                       
++---+---------------------+-----------+  
+
+
+2) Count of unique customers and total sales for one age group(A) for all products - [ sort data on totalsales desc- find top 10]
+
+	ProdA	count of unique cust	total sales
+	ProdB	‘’					‘’
+
+Hint : where trim(age)  = 'A'
+
+Select product,COUNT(DISTINCT cust_id) as count_of_unique_cust,sum(sale) as totalsales
+from retail
+where trim(age)='A'
+group by Product
+order by sum(sale) 
+
++-------------+--------------------+----------+
+|      product|count_of_unique_cust|totalsales|                                                                                               
++-------------+--------------------+----------+                                                                                               
+|20360030     |                   1|         6|                                                                                               
+|20352196     |                   1|         7|                                                                                               
+|4715140008651|                   1|         8|                                                                                               
+|4713691100404|                   1|         9|                                                                                               
+|20513368     |                   1|        10|                                                                                               
+|4715140009566|                   1|        10|                                                                                               
+|20451370     |                   2|        10|                                                                                               
+|4714725260026|                   1|        10|                                                                                               
+|4719859760978|                   1|        11|                                                                                               
+|4718057700045|                   1|        11|                                                                                                                                                                                          
++-------------+--------------------+----------+ 
+
+3) Area wise sales   
+
+select count(distinct cust_id), zipcode , sum(sale)
+from retail
+group by zipcode
+order by zipcode
+
++-----------------------+-------+---------+
+|count(DISTINCT cust_id)|zipcode|sum(sale)|                                                                                                   
++-----------------------+-------+---------+                                                                                                   
+|                    972|     A |  2344440|                                                                                                   
+|                    937|     B |  2799090|                                                                                                   
+|                   3689|     C |  9866326|                                                                                                   
+|                   2169|     D |  5447881|                                                                                                   
+|                  10803|     E | 37994770|                                                                                                   
+|                   8542|     F | 31548341|                                                                                                   
+|                   3701|     G | 12593633|                                                                                                   
+|                   1453|     H |  5245595|                                                                                                   
++-----------------------+-------+---------+    
+
+
+4) find top 10 viable products (prod which give highest profit)
+
+select product,sum(sale - cost) as profit 
+from retail
+group by product 
+order by profit desc
+
++-------------+------+
+|      product|profit|                                                                                                                        
++-------------+------+                                                                                                                        
+|4909978112950| 71312|                                                                                                                        
+|8712045008539| 46586|                                                                                                                        
+|20564100     | 38699|                                                                                                                        
+|4710628131012| 34429|                                                                                                                        
+|0729238191921| 33645|                                                                                                                        
+|4902430493437| 32970|                                                                                                                        
+|20556433     | 31862|                                                                                                                        
+|4901422038939| 31616|                                                                                                                        
+|4710114128038| 29168|                                                                                                                        
+|7610053910787| 26839|                                                                                                                        
++-------------+------+ 
+
+
+5) find all loss making products – Display all the loss making products from highest loss to the least
+
+select product,sum(sale-cost) as profit 
+from retail
+group by product 
+having profit < 0
+order by profit
+
++-------------+-------+
+|      product| profit|
++-------------+-------+
+|4714981010038|-131002|
+|4711271000014| -46213|
+|4719090900065| -44331|
+|4710265849066| -38969|
+|4712425010712| -17646|
+|2110119000377| -17457|
+|4710908110232| -15072|
+|4719090900058| -14034|
+|4710265847666| -11657|
+|4710683100015| -11456|
++-------------+-------+
+
+
+
+
+
+
+
+
+
+
+
+
